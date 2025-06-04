@@ -1,7 +1,31 @@
 #include <SDL.h>
 #include <thread>
-#include <complex>
 #include <direct.h>
+#include <cmath>
+
+// simple complex number implementation used to avoid potential performance
+// issues with std::complex on some platforms
+struct Complex {
+    long double r;
+    long double i;
+
+    Complex(long double real = 0.0L, long double imag = 0.0L) : r(real), i(imag) {}
+};
+
+inline Complex operator+(const Complex& a, const Complex& b) {
+    return Complex(a.r + b.r, a.i + b.i);
+}
+
+inline Complex operator*(const Complex& a, const Complex& b) {
+    return Complex(a.r * b.r - a.i * b.i, a.r * b.i + a.i * b.r);
+}
+
+inline long double real(const Complex& a) { return a.r; }
+inline long double imag(const Complex& a) { return a.i; }
+
+inline long double abs(const Complex& a) {
+    return sqrtl(a.r * a.r + a.i * a.i);
+}
 
 
 using namespace std;
@@ -17,16 +41,18 @@ using namespace std;
 
 const int threadCount = thread::hardware_concurrency() + 20;	// number of render threads, better to have slightly more than your actual CPU logical cores
 
-void renderPart(int index, long double zoom, complex<long double> center, SDL_Surface* surface) {
+void renderPart(int index, long double zoom, Complex center, SDL_Surface* surface) {
 	int x, y, n;
 	int maxiter = (WIDTH / 2) * 0.06L * log10(zoom);	// change the multiplication value to adjust how precision scales with zoom
-	complex<long double> z, c;
+	Complex z, c;
 	long double C;
 	int flips = threadCount;
 
 	for (y = index * (HEIGHT / flips); y < (index + 1) * (HEIGHT / flips); ++y) {
 		for (x = 0; x < WIDTH; ++x) {
-			z = c = real(center) + ((x - (WIDTH / 2)) / zoom) + ((imag(center) + ((y - (HEIGHT / 2)) / zoom)) * complex<long double>(0.0L, 1.0L));
+			long double rp = center.r + ((x - (WIDTH / 2)) / zoom);
+                        long double ip = center.i + ((y - (HEIGHT / 2)) / zoom);
+                        z = c = Complex(rp, ip);
 
 			#define X real(z)
 			#define Y imag(z)
@@ -37,7 +63,7 @@ void renderPart(int index, long double zoom, complex<long double> center, SDL_Su
 			}
 			else {
 				for (n = 0; n <= maxiter && abs(z) < BAIL_OUT; ++n) {
-					z = pow(z, 2) + c;
+					z = z * z + c;
 				}
 			}
 
@@ -48,7 +74,7 @@ void renderPart(int index, long double zoom, complex<long double> center, SDL_Su
 	}
 }
 
-void drawMandelbrotMultithreaded(SDL_Window* window, SDL_Surface* surface, complex<long double> center, long double zoom) {
+void drawMandelbrotMultithreaded(SDL_Window* window, SDL_Surface* surface, Complex center, long double zoom) {
 	//chrono::steady_clock::time_point start = chrono::high_resolution_clock::now(), end;
 	
 	int flips = threadCount;	// number of splits of the screen, each thread renders a part of the screen
@@ -88,12 +114,12 @@ int main(int argc, char* argv[]) {
 
 	SDL_Surface* surface = SDL_GetWindowSurface(window);
 
-	complex<long double> center = START_POS;
+	Complex center = START_POS;
 	long double zoom = START_ZOOM;
 	bool autozoom = true;
 
 	if (autozoom) {
-		center = complex<long double>(-1.315180982097868, 0.073481649996795);	// location to zoom at, you can search for other interesting locations on the internet
+		center = Complex(-1.315180982097868L, 0.073481649996795L);	// location to zoom at, you can search for other interesting locations on the internet
 	}
 
 	_mkdir("images");
@@ -123,7 +149,7 @@ int main(int argc, char* argv[]) {
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:	// zoom by zoom factor to the mouse location when left click
-			center = real(center) + ((event.button.x - (WIDTH / 2)) / zoom) + ((imag(center) + ((event.button.y - (HEIGHT / 2)) / zoom)) * complex<long double>(0.0L, 1.0L));
+			center = Complex(center.r + ((event.button.x - (WIDTH / 2)) / zoom), center.i + ((event.button.y - (HEIGHT / 2)) / zoom));
 
 			if (event.button.button == 1) {
 				zoom *= ZOOM_FACTOR + log10(zoom);
