@@ -2,6 +2,10 @@
 #include <thread>
 #include <direct.h>
 #include <cmath>
+#include <chrono>
+#include <string>
+#include <iostream>
+#include <vector>
 
 // simple complex number implementation used to avoid potential performance
 // issues with std::complex on some platforms
@@ -30,8 +34,8 @@ inline long double abs(const Complex& a) {
 
 using namespace std;
 
-#define WIDTH 2560
-#define HEIGHT 1440
+#define WIDTH 1280
+#define HEIGHT 720
 
 #define START_POS -0.5
 #define START_ZOOM (WIDTH * 0.25296875L) - 200
@@ -48,7 +52,10 @@ void renderPart(int index, long double zoom, Complex center, SDL_Surface* surfac
 	long double C;
 	int flips = threadCount;
 
-	for (y = index * (HEIGHT / flips); y < (index + 1) * (HEIGHT / flips); ++y) {
+	int startY = (index * HEIGHT) / flips;
+	int endY = ((index + 1) * HEIGHT) / flips;
+
+	for (y = startY; y < endY; ++y) {
 		for (x = 0; x < WIDTH; ++x) {
 			long double rp = center.r + ((x - (WIDTH / 2)) / zoom);
                         long double ip = center.i + ((y - (HEIGHT / 2)) / zoom);
@@ -75,13 +82,13 @@ void renderPart(int index, long double zoom, Complex center, SDL_Surface* surfac
 }
 
 void drawMandelbrotMultithreaded(SDL_Window* window, SDL_Surface* surface, Complex center, long double zoom) {
-	//chrono::steady_clock::time_point start = chrono::high_resolution_clock::now(), end;
+	chrono::steady_clock::time_point start = chrono::high_resolution_clock::now(), end;
 	
 	int flips = threadCount;	// number of splits of the screen, each thread renders a part of the screen
-	thread threads[HEIGHT];
+	std::vector<std::thread> threads(flips);
 
 	for (int f = 0; f < flips; ++f) {
-		threads[f] = thread(renderPart, f, zoom, center, surface);
+		threads[f] = std::thread(renderPart, f, zoom, center, surface);
 	}
 
 	for (int f = 0; f < flips; ++f) {
@@ -90,13 +97,9 @@ void drawMandelbrotMultithreaded(SDL_Window* window, SDL_Surface* surface, Compl
 
 	SDL_UpdateWindowSurface(window);
 
-	/*end = chrono::high_resolution_clock::now();
+	end = chrono::high_resolution_clock::now();
 	int mills = chrono::duration<double, milli>(end - start).count();
-	ostringstream time;
-	time << "Time spent: ";
-	time << mills;
-	time << " ms\n";
-	OutputDebugString(time.str().c_str());*/
+	std::cout << "Rendered in " << mills << " ms" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -119,7 +122,8 @@ int main(int argc, char* argv[]) {
 	bool autozoom = true;
 
 	if (autozoom) {
-		center = Complex(-1.315180982097868L, 0.073481649996795L);	// location to zoom at, you can search for other interesting locations on the internet
+		//center = Complex(-1.315180982097868L, 0.073481649996795L);	// location to zoom at, you can search for other interesting locations on the internet
+		center = Complex(-0.743643887037151L, 0.131825904205330L);
 	}
 
 	_mkdir("images");
